@@ -41,11 +41,8 @@ class FaceMeshDetector:
         Returns:
             Face landmarks or None if no face detected
         """
-        # Convert BGR to RGB for MediaPipe
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        # Process the image
         results = self.face_mesh.process(image_rgb)
-        # Return the first face's landmarks if any
         return results.multi_face_landmarks[0] if results.multi_face_landmarks else None
     
     def draw_face_landmarks(self, image, landmarks, color=(0, 255, 0), radius=1):
@@ -62,9 +59,7 @@ class FaceMeshDetector:
             Image with landmarks drawn
         """
         for lm in landmarks.landmark:
-            # Convert normalized coordinates to pixel coordinates
             x = int(lm.x * image.shape[1])
             y = int(lm.y * image.shape[0])
-            # Draw the landmark point
             cv2.circle(image, (x, y), radius, color, -1)
         return image

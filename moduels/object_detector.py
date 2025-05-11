@@ -14,12 +14,10 @@ class ObjectDetector:
             model_path: Path to the TFLite model file
             score_threshold: Minimum confidence score for detection
         """
-        # Load the model
         try:
             with open(model_path, "rb") as f:
                 model_data = f.read()
                 
-            # Initialize the detector with the model buffer
             base_options = python.BaseOptions(model_asset_buffer=model_data)
             options = vision.ObjectDetectorOptions(
                 base_options=base_options,
@@ -39,11 +37,8 @@ class ObjectDetector:
         Returns:
             Detection results from MediaPipe
         """
-        # Convert BGR to RGB for MediaPipe
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        # Create MediaPipe image
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
-        # Detect objects
         return self.detector.detect(mp_image)
     
     def draw_detection_result(self, image, detection_result, objects_to_detect=None):
@@ -64,42 +59,30 @@ class ObjectDetector:
         if not detection_result.detections:
             return image, {}
         
-        # Create a copy of the image to draw on
         annotated_image = image.copy()
-        
-        # Dictionary to track detected objects and their counts
         detected_objects = {}
         
         for detection in detection_result.detections:
-            # Get category information
             category = detection.categories[0]
             category_name = category.category_name
             probability = round(category.score, 2)
             
-            # Skip if not in allowed objects list
             if objects_to_detect and category_name.lower() not in [obj.lower() for obj in objects_to_detect]:
                 continue
             
-            # Update detected objects count
             if category_name in detected_objects:
                 detected_objects[category_name] += 1
             else:
                 detected_objects[category_name] = 1
             
-            # Get bounding box coordinates
             bbox = detection.bounding_box
             x1 = bbox.origin_x
             y1 = bbox.origin_y
             x2 = x1 + bbox.width
             y2 = y1 + bbox.height
-            
-            # Draw bounding box
             cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            
-            # Draw label
             label = f"{category_name}: {probability}"
             
-            # Position the label text above the rectangle
             cv2.putText(
                 annotated_image, 
                 label, 

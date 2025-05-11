@@ -14,7 +14,7 @@ COCO_OBJECTS = [
     'toothbrush'
 ]
 
-# Most commonly used categories for convenience
+# Used for object detection task
 COMMON_OBJECTS = [
     'person', 'car', 'cell phone', 'laptop', 'chair', 'cup', 
     'bottle', 'tv', 'book', 'dog', 'cat', 'keyboard', 'mouse'
@@ -30,16 +30,13 @@ def get_category_color(category_name):
     Returns:
         BGR color tuple for the category
     """
-    # Generate a simple hash of the category name
     hash_value = sum(ord(c) for c in category_name) % 255
-    
-    # Create different colors based on the hash
     if hash_value < 85:
-        return (hash_value * 3, 255, 255 - hash_value * 3)  # Reddish
+        return (hash_value * 3, 255, 255 - hash_value * 3)
     elif hash_value < 170:
-        return (255 - (hash_value - 85) * 3, 255, (hash_value - 85) * 3)  # Greenish
+        return (255 - (hash_value - 85) * 3, 255, (hash_value - 85) * 3)
     else:
-        return (255, 255 - (hash_value - 170) * 3, 255)  # Bluish
+        return (255, 255 - (hash_value - 170) * 3, 255)
 
 def create_markdown_table(data_dict):
     """

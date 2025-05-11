@@ -43,16 +43,17 @@ objects_to_detect = st.sidebar.multiselect(
 )
 
 # Model loading notice
+face_detector = FaceMeshDetector(
+    static_image_mode=False,
+    max_num_faces=1,
+    min_detection_confidence=face_mesh_confidence,
+    min_tracking_confidence=face_mesh_confidence
+)
 st.sidebar.markdown("---")
 try:
     with st.sidebar.spinner("Loading models..."):
         # Load Face Mesh Model
-        face_detector = FaceMeshDetector(
-            static_image_mode=False,
-            max_num_faces=1,
-            min_detection_confidence=face_mesh_confidence,
-            min_tracking_confidence=face_mesh_confidence
-        )
+
 
         # Load Object Detection Model
         model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")

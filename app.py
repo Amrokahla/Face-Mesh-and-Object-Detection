@@ -107,83 +107,92 @@ with col2:
     st.caption("Powered by MediaPipe, OpenCV and Streamlit")
 
 # Video processing
+# Initialize session state for frame management
+if 'frame_counter' not in st.session_state:
+    st.session_state.frame_counter = 0
+
+# Video processing
 if video_file:
     try:
-        # Write video to a temporary location
-        temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
-        with open(temp_video_path, "wb") as temp_video:
-            temp_video.write(video_file.read())
-        
-        # Open the video file
-        cap = cv2.VideoCapture(temp_video_path)
+        if face_detector is not None and object_detector is not None:
+            # Write uploaded video to a temporary location
+            temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
+            with open(temp_video_path, "wb") as temp_video:
+                temp_video.write(video_file.read())
 
-        if not cap.isOpened():
-            st.error("Could not open video file.")
-        else:
-            face_count = 0
-            object_counts = {}
+            # Open the video
+            cap = cv2.VideoCapture(temp_video_path)
 
-            while cap.isOpened():
-                ret, frame = cap.read()
-                if not ret:
-                    break
-
-                # Process the frame
-                processed_frame = frame.copy()
-
-                # Reset counters for this frame
+            if not cap.isOpened():
+                st.error("Could not open video file.")
+            else:
                 face_count = 0
-                frame_objects = {}
+                object_counts = {}
 
-                # Face mesh detection
-                if show_face_mesh:
-                    landmarks = face_detector.get_face_landmarks(processed_frame)
-                    if landmarks:
-                        processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
-                        face_count = 1
+                frame_skip = 5  # Process every 5th frame for smoother results
 
-                # Object detection
-                if show_object_detection:
-                    detection_result = object_detector.detect_objects(processed_frame)
-                    processed_frame, detected_objects = object_detector.draw_detection_result(
-                        processed_frame, 
-                        detection_result, 
-                        objects_to_detect=objects_to_detect if objects_to_detect else None
-                    )
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
 
-                    # Update object counts
-                    frame_objects = detected_objects
-                    for obj in frame_objects:
-                        if obj in object_counts:
-                            object_counts[obj] = max(object_counts[obj], frame_objects[obj])
-                        else:
-                            object_counts[obj] = frame_objects[obj]
+                    # Increment frame counter; only process every nth frame
+                    st.session_state.frame_counter += 1
+                    if st.session_state.frame_counter % frame_skip != 0:
+                        continue
 
-                # Convert BGR to RGB for display
-                processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+                    # Resize frame for faster processing (optional)
+                    frame = cv2.resize(frame, (640, 360))
 
-                # Display the processed frame
-                video_placeholder.image(processed_frame_rgb, channels="RGB", use_container_width=True)
+                    # Process the frame
+                    processed_frame = frame.copy()
 
-                # Update stats
-                stats_text = f"""
-                ## Current Frame Stats
-                - **Faces Detected:** {face_count}
+                    face_count = 0
+                    frame_objects = {}
 
-                ## Objects Detected
-                """
-                for obj, count in frame_objects.items():
-                    stats_text += f"- **{obj}:** {count}\n"
+                    # Face mesh detection
+                    if show_face_mesh:
+                        landmarks = face_detector.get_face_landmarks(processed_frame)
+                        if landmarks:
+                            processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                            face_count = 1
 
-                stats_placeholder.markdown(stats_text)
+                    # Object detection
+                    if show_object_detection:
+                        detection_result = object_detector.detect_objects(processed_frame)
+                        processed_frame, detected_objects = object_detector.draw_detection_result(
+                            processed_frame, 
+                            detection_result, 
+                            objects_to_detect=objects_to_detect if objects_to_detect else None
+                        )
 
-                # Break the loop if 'q' key is pressed
-                #if cv2.waitKey(1) & 0xFF == ord('q'):
-                #    break
+                        # Update object counts
+                        frame_objects = detected_objects
+                        for obj in frame_objects:
+                            if obj in object_counts:
+                                object_counts[obj] = max(object_counts[obj], frame_objects[obj])
+                            else:
+                                object_counts[obj] = frame_objects[obj]
 
-        # Cleanup
-        cap.release()
-        os.remove(temp_video_path)
+                    # Convert BGR to RGB for display
+                    processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+
+                    # Display the processed frame
+                    video_placeholder.image(processed_frame_rgb, channels="RGB", use_container_width=True)
+
+                    stats_text = f"""
+                    ## Current Frame Stats
+                    - **Faces Detected:** {face_count}
+                    ## Objects Detected
+                    """
+                    for obj, count in frame_objects.items():
+                        stats_text += f"- **{obj}:** {count}\n"
+                    
+                    stats_placeholder.markdown(stats_text)
+
+            # Cleanup
+            cap.release()
+            os.remove(temp_video_path)
 
     except Exception as e:
         st.error(f"Error processing the video: {e}")

@@ -1,10 +1,11 @@
 import streamlit as st
 import os
 import numpy as np
+import cv2
+from tempfile import NamedTemporaryFile
 from modules.face_mesh import FaceMeshDetector
 from modules.object_detector import ObjectDetector
 from modules.utils import COCO_OBJECTS
-import cv2
 
 # Set page config
 st.set_page_config(
@@ -42,36 +43,23 @@ objects_to_detect = st.sidebar.multiselect(
     default=["person", "cell phone", "laptop"]
 )
 
-# Model loading notice
-st.sidebar.markdown("---")
-
-# You can start without the spinner and reintroduce it once you verify other code parts
-
-    # Manually print loading status
-st.sidebar.text("Loading Face Mesh Model...")
-# Face Mesh Model Logic
+# Initialize models
 face_detector = FaceMeshDetector(
     static_image_mode=False,
     max_num_faces=1,
     min_detection_confidence=face_mesh_confidence,
     min_tracking_confidence=face_mesh_confidence
 )
-st.sidebar.success("Face Mesh Model loaded successfully!")
 
-st.sidebar.text("Checking Object Detection Model path...")
-model_path = os.path.join(os.path.dirname(__file__), "model", "efficientdet_lite0.tflite")
-if not os.path.exists(model_path):
-    st.sidebar.error(f"Model file not found: {model_path}")
-    st.sidebar.info("Please download the model file and place it in the models directory")
-else:
-    st.sidebar.text("Loading Object Detection Model...")
+model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+object_detector = None
+if os.path.exists(model_path):
     object_detector = ObjectDetector(
         model_path=model_path,
         score_threshold=object_confidence
     )
-    st.sidebar.success("Object Detection Model loaded successfully!")
-
-
+else:
+    st.sidebar.error(f"Model file not found: {model_path}")
 
 # Main content
 col1, col2 = st.columns([3, 2])
@@ -107,11 +95,6 @@ with col2:
     st.caption("Powered by MediaPipe, OpenCV and Streamlit")
 
 # Video processing
-# Initialize session state for frame management
-if 'frame_counter' not in st.session_state:
-    st.session_state.frame_counter = 0
-
-# Video processing
 if video_file:
     try:
         if face_detector is not None and object_detector is not None:
@@ -122,6 +105,17 @@ if video_file:
 
             # Open the video
             cap = cv2.VideoCapture(temp_video_path)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+
+            # Create a temporary file to save the processed video
+            temp_output_file = NamedTemporaryFile(delete=False, suffix=".mp4")
+            temp_output_file.close()
+
+            # Initialize VideoWriter for output
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec
+            out = cv2.VideoWriter(temp_output_file.name, fourcc, fps, (width, height))
 
             if not cap.isOpened():
                 st.error("Could not open video file.")
@@ -137,8 +131,7 @@ if video_file:
                         break
 
                     # Increment frame counter; only process every nth frame
-                    st.session_state.frame_counter += 1
-                    if st.session_state.frame_counter % frame_skip != 0:
+                    if int(cap.get(cv2.CAP_PROP_POS_FRAMES)) % frame_skip != 0:
                         continue
 
                     # Resize frame for faster processing (optional)
@@ -174,6 +167,9 @@ if video_file:
                             else:
                                 object_counts[obj] = frame_objects[obj]
 
+                    # Write the frame to output video
+                    out.write(processed_frame)
+
                     # Convert BGR to RGB for display
                     processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
 
@@ -190,9 +186,18 @@ if video_file:
                     
                     stats_placeholder.markdown(stats_text)
 
-            # Cleanup
+            # Cleanup VideoCapture and VideoWriter
             cap.release()
-            os.remove(temp_video_path)
+            out.release()
+
+            # Provide download link
+            with open(temp_output_file.name, "rb") as file:
+                btn = st.download_button(
+                    label="Download Processed Video",
+                    data=file,
+                    file_name="processed_video.mp4",
+                    mime="video/mp4"
+                )
 
     except Exception as e:
         st.error(f"Error processing the video: {e}")

@@ -82,29 +82,6 @@ with col1:
     video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
     video_placeholder = st.empty()
 
-with col2:
-    # Display statistics and info
-    st.header("Detection Information")
-    stats_placeholder = st.empty()
-
-    # Display the selected objects
-    st.subheader("Selected Objects")
-    if objects_to_detect:
-        for obj in objects_to_detect:
-            st.write(f"- {obj}")
-    else:
-        st.write("No objects selected for filtering")
-
-    # Information about face mesh
-    st.subheader("About Face Mesh")
-    st.write("""
-    The face mesh detector identifies 468 landmarks on a human face, 
-    allowing for detailed facial analysis and tracking.
-    """)
-
-    # Credits
-    st.markdown("---")
-    st.caption("Powered by MediaPipe, OpenCV and Streamlit")
 
 # Video processing
 # Initialize session state for frame management

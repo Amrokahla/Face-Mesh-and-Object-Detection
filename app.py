@@ -163,7 +163,7 @@ if video_file:
                 processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
 
                 # Display the processed frame
-                video_placeholder.image(processed_frame_rgb, channels="RGB", use_column_width=True)
+                video_placeholder.image(processed_frame_rgb, channels="RGB", use_container_width=True)
 
                 # Update stats
                 stats_text = f"""
@@ -178,8 +178,8 @@ if video_file:
                 stats_placeholder.markdown(stats_text)
 
                 # Break the loop if 'q' key is pressed
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+                #if cv2.waitKey(1) & 0xFF == ord('q'):
+                #    break
 
         # Cleanup
         cap.release()

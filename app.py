@@ -1,17 +1,19 @@
 import streamlit as st
 import os
-import cv2
-from tempfile import NamedTemporaryFile
+import numpy as np
 from modules.face_mesh import FaceMeshDetector
 from modules.object_detector import ObjectDetector
 from modules.utils import COCO_OBJECTS
+import cv2
 
+# Set page config
 st.set_page_config(
     page_title="Face & Object Detection",
     page_icon="🔍",
-    layout="wide",
+    layout="wide"
 )
 
+# Page title and description
 st.title("Face Mesh & Object Detection")
 st.markdown("""
 This application uses MediaPipe to perform:
@@ -19,14 +21,20 @@ This application uses MediaPipe to perform:
 2. 🔍 **Object Detection**: Recognizes common objects
 """)
 
-# Sidebar widgets
+# Sidebar configuration
 st.sidebar.title("Configuration")
+
+# Face mesh options
 st.sidebar.header("Face Mesh Settings")
 show_face_mesh = st.sidebar.checkbox("Enable Face Mesh", value=True)
 face_mesh_confidence = st.sidebar.slider("Face Mesh Confidence", 0.1, 1.0, 0.5, 0.1)
+
+# Object detection options
 st.sidebar.header("Object Detection Settings")
 show_object_detection = st.sidebar.checkbox("Enable Object Detection", value=True)
 object_confidence = st.sidebar.slider("Object Detection Confidence", 0.1, 1.0, 0.5, 0.1)
+
+# Object filtering
 st.sidebar.header("Object Filtering")
 objects_to_detect = st.sidebar.multiselect(
     "Select objects to detect",
@@ -34,100 +42,157 @@ objects_to_detect = st.sidebar.multiselect(
     default=["person", "cell phone", "laptop"]
 )
 
-# Init models
-face_detector = None
-object_detector = None
+# Model loading notice
+st.sidebar.markdown("---")
 
-try:
-    face_detector = FaceMeshDetector(
-        static_image_mode=False,
-        max_num_faces=1,
-        min_detection_confidence=face_mesh_confidence,
-        min_tracking_confidence=face_mesh_confidence,
-    )
-except Exception as e:
-    st.sidebar.error(f"Error loading Face Mesh model: {e}")
+# You can start without the spinner and reintroduce it once you verify other code parts
 
-model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+    # Manually print loading status
+st.sidebar.text("Loading Face Mesh Model...")
+# Face Mesh Model Logic
+face_detector = FaceMeshDetector(
+    static_image_mode=False,
+    max_num_faces=1,
+    min_detection_confidence=face_mesh_confidence,
+    min_tracking_confidence=face_mesh_confidence
+)
+st.sidebar.success("Face Mesh Model loaded successfully!")
+
+st.sidebar.text("Checking Object Detection Model path...")
+model_path = os.path.join(os.path.dirname(__file__), "model", "efficientdet_lite0.tflite")
 if not os.path.exists(model_path):
-    st.sidebar.error(f"Object detection model file not found: {model_path}")
+    st.sidebar.error(f"Model file not found: {model_path}")
+    st.sidebar.info("Please download the model file and place it in the models directory")
 else:
-    try:
-        object_detector = ObjectDetector(
-            model_path=model_path,
-            score_threshold=object_confidence,
-        )
-    except Exception as e:
-        st.sidebar.error(f"Error loading Object Detector model: {e}")
+    st.sidebar.text("Loading Object Detection Model...")
+    object_detector = ObjectDetector(
+        model_path=model_path,
+        score_threshold=object_confidence
+    )
+    st.sidebar.success("Object Detection Model loaded successfully!")
 
-# Main app UI
-st.header("Upload Video for Detection")
-video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
 
-if video_file:
-    # Upload step
-    temp_video_path = NamedTemporaryFile(delete=False, suffix=f".{video_file.name.split('.')[-1]}").name
-    with open(temp_video_path, "wb") as f:
-        f.write(video_file.read())
-    st.success("Uploaded successfully!")
 
-    # Processing step (progress bar)
-    cap = cv2.VideoCapture(temp_video_path)
-    if not cap.isOpened():
-        st.error("Could not open the uploaded video.")
+# Main content
+col1, col2 = st.columns([3, 2])
+
+with col1:
+    # Video upload
+    st.header("Upload Video for Detection")
+    video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
+    video_placeholder = st.empty()
+
+with col2:
+    # Display statistics and info
+    st.header("Detection Information")
+    stats_placeholder = st.empty()
+
+    # Display the selected objects
+    st.subheader("Selected Objects")
+    if objects_to_detect:
+        for obj in objects_to_detect:
+            st.write(f"- {obj}")
     else:
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        st.write("No objects selected for filtering")
 
-        temp_output_file = NamedTemporaryFile(delete=False, suffix=".mp4")
-        temp_output_file.close()
+    # Information about face mesh
+    st.subheader("About Face Mesh")
+    st.write("""
+    The face mesh detector identifies 468 landmarks on a human face, 
+    allowing for detailed facial analysis and tracking.
+    """)
 
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out = cv2.VideoWriter(temp_output_file.name, fourcc, fps, (width, height))
+    # Credits
+    st.markdown("---")
+    st.caption("Powered by MediaPipe, OpenCV and Streamlit")
 
-        processing_progress = st.progress(0)
+# Video processing
+# Initialize session state for frame management
+if 'frame_counter' not in st.session_state:
+    st.session_state.frame_counter = 0
 
-        processed_frames = 0
+# Video processing
+if video_file:
+    try:
+        if face_detector is not None and object_detector is not None:
+            # Write uploaded video to a temporary location
+            temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
+            with open(temp_video_path, "wb") as temp_video:
+                temp_video.write(video_file.read())
 
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
+            # Open the video
+            cap = cv2.VideoCapture(temp_video_path)
 
-            processed_frame = frame.copy()
+            if not cap.isOpened():
+                st.error("Could not open video file.")
+            else:
+                face_count = 0
+                object_counts = {}
 
-            if show_face_mesh and face_detector is not None:
-                landmarks = face_detector.get_face_landmarks(processed_frame)
-                if landmarks:
-                    processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                frame_skip = 5  # Process every 5th frame for smoother results
 
-            if show_object_detection and object_detector is not None:
-                detection_result = object_detector.detect_objects(processed_frame)
-                processed_frame, _ = object_detector.draw_detection_result(
-                    processed_frame,
-                    detection_result,
-                    objects_to_detect=objects_to_detect if objects_to_detect else None,
-                )
+                while cap.isOpened():
+                    ret, frame = cap.read()
+                    if not ret:
+                        break
 
-            out.write(processed_frame)
+                    # Increment frame counter; only process every nth frame
+                    st.session_state.frame_counter += 1
+                    if st.session_state.frame_counter % frame_skip != 0:
+                        continue
 
-            processed_frames += 1
-            processing_progress.progress(int(processed_frames / frame_count * 100))
+                    # Resize frame for faster processing (optional)
+                    frame = cv2.resize(frame, (640, 360))
 
-        cap.release()
-        out.release()
-        processing_progress.empty()  # Remove progress bar
-        st.success("Processing completed successfully!")
+                    # Process the frame
+                    processed_frame = frame.copy()
 
-        # Download button
-        with open(temp_output_file.name, "rb") as f:
-            st.download_button(
-                label="Download Processed Video",
-                data=f,
-                file_name="processed_video.mp4",
-                mime="video/mp4",
-            )
+                    face_count = 0
+                    frame_objects = {}
 
-        os.remove(temp_video_path)
+                    # Face mesh detection
+                    if show_face_mesh:
+                        landmarks = face_detector.get_face_landmarks(processed_frame)
+                        if landmarks:
+                            processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                            face_count = 1
+
+                    # Object detection
+                    if show_object_detection:
+                        detection_result = object_detector.detect_objects(processed_frame)
+                        processed_frame, detected_objects = object_detector.draw_detection_result(
+                            processed_frame, 
+                            detection_result, 
+                            objects_to_detect=objects_to_detect if objects_to_detect else None
+                        )
+
+                        # Update object counts
+                        frame_objects = detected_objects
+                        for obj in frame_objects:
+                            if obj in object_counts:
+                                object_counts[obj] = max(object_counts[obj], frame_objects[obj])
+                            else:
+                                object_counts[obj] = frame_objects[obj]
+
+                    # Convert BGR to RGB for display
+                    processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+
+                    # Display the processed frame
+                    video_placeholder.image(processed_frame_rgb, channels="RGB", use_container_width=True)
+
+                    stats_text = f"""
+                    ## Current Frame Stats
+                    - **Faces Detected:** {face_count}
+                    ## Objects Detected
+                    """
+                    for obj, count in frame_objects.items():
+                        stats_text += f"- **{obj}:** {count}\n"
+                    
+                    stats_placeholder.markdown(stats_text)
+
+            # Cleanup
+            cap.release()
+            os.remove(temp_video_path)
+
+    except Exception as e:
+        st.error(f"Error processing the video: {e}")

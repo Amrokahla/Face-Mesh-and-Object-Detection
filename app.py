@@ -46,32 +46,31 @@ objects_to_detect = st.sidebar.multiselect(
 st.sidebar.markdown("---")
 
 # You can start without the spinner and reintroduce it once you verify other code parts
-try:
+
     # Manually print loading status
-    st.sidebar.text("Loading Face Mesh Model...")
-    # Face Mesh Model Logic
-    face_detector = FaceMeshDetector(
-        static_image_mode=False,
-        max_num_faces=1,
-        min_detection_confidence=face_mesh_confidence,
-        min_tracking_confidence=face_mesh_confidence
+st.sidebar.text("Loading Face Mesh Model...")
+# Face Mesh Model Logic
+face_detector = FaceMeshDetector(
+    static_image_mode=False,
+    max_num_faces=1,
+    min_detection_confidence=face_mesh_confidence,
+    min_tracking_confidence=face_mesh_confidence
+)
+st.sidebar.success("Face Mesh Model loaded successfully!")
+
+st.sidebar.text("Checking Object Detection Model path...")
+model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+if not os.path.exists(model_path):
+    st.sidebar.error(f"Model file not found: {model_path}")
+    st.sidebar.info("Please download the model file and place it in the models directory")
+else:
+    st.sidebar.text("Loading Object Detection Model...")
+    object_detector = ObjectDetector(
+        model_path=model_path,
+        score_threshold=object_confidence
     )
-    st.sidebar.success("Face Mesh Model loaded successfully!")
-    
-    st.sidebar.text("Checking Object Detection Model path...")
-    model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
-    if not os.path.exists(model_path):
-        st.sidebar.error(f"Model file not found: {model_path}")
-        st.sidebar.info("Please download the model file and place it in the models directory")
-    else:
-        st.sidebar.text("Loading Object Detection Model...")
-        object_detector = ObjectDetector(
-            model_path=model_path,
-            score_threshold=object_confidence
-        )
-        st.sidebar.success("Object Detection Model loaded successfully!")
-except Exception as e:
-    st.sidebar.error(f"Unexpected error during model initialization: {e}")
+    st.sidebar.success("Object Detection Model loaded successfully!")
+
 
 
 # Main content

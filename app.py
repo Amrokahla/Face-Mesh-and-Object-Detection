@@ -46,58 +46,29 @@ objects_to_detect = st.sidebar.multiselect(
 face_detector = None
 object_detector = None
 
-# Face mesh options
-st.sidebar.header("Face Mesh Settings")
-show_face_mesh = st.sidebar.checkbox("Enable Face Mesh", value=True)
-face_mesh_confidence = st.sidebar.slider("Face Mesh Confidence", 0.1, 1.0, 0.5, 0.1)
-
-# Object detection options
-st.sidebar.header("Object Detection Settings")
-show_object_detection = st.sidebar.checkbox("Enable Object Detection", value=True)
-object_confidence = st.sidebar.slider("Object Detection Confidence", 0.1, 1.0, 0.5, 0.1)
-
-# Object filtering
-st.sidebar.header("Object Filtering")
-objects_to_detect = st.sidebar.multiselect(
-    "Select objects to detect",
-    options=COCO_OBJECTS,
-    default=["person", "cell phone", "laptop"]
-)
-
-# Initialize model variables
-face_detector = None
-object_detector = None
-
 # Model loading notice
 st.sidebar.markdown("---")
 try:
     with st.sidebar.spinner("Loading models..."):
         # Load Face Mesh Model
-        try:
-            face_detector = FaceMeshDetector(
-                static_image_mode=False,
-                max_num_faces=1,
-                min_detection_confidence=face_mesh_confidence,
-                min_tracking_confidence=face_mesh_confidence
-            )
-            st.sidebar.success("Face Mesh Model loaded successfully!")
-        except Exception as e:
-            st.sidebar.error(f"Face Mesh Model Initialization Error: {e}")
+        face_detector = FaceMeshDetector(
+            static_image_mode=False,
+            max_num_faces=1,
+            min_detection_confidence=face_mesh_confidence,
+            min_tracking_confidence=face_mesh_confidence
+        )
 
         # Load Object Detection Model
-        try:
-            model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
-            if not os.path.exists(model_path):
-                st.sidebar.error(f"Model file not found: {model_path}")
-                st.sidebar.info("Please download the model file and place it in the models directory")
-            else:
-                object_detector = ObjectDetector(
-                    model_path=model_path,
-                    score_threshold=object_confidence
-                )
-                st.sidebar.success("Object Detection Model loaded successfully!")
-        except Exception as e:
-            st.sidebar.error(f"Object Detection Model Initialization Error: {e}")
+        model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+        if not os.path.exists(model_path):
+            st.sidebar.error(f"Model file not found: {model_path}")
+            st.sidebar.info("Please download the model file and place it in the models directory")
+        else:
+            object_detector = ObjectDetector(
+                model_path=model_path,
+                score_threshold=object_confidence
+            )
+            st.sidebar.success("Models loaded successfully!")
 except Exception as e:
     st.sidebar.error(f"Unexpected error during model initialization: {e}")
 

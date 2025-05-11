@@ -1,20 +1,21 @@
 import streamlit as st
-import cv2
 import os
 import numpy as np
+import cv2
+from tempfile import NamedTemporaryFile
 from modules.face_mesh import FaceMeshDetector
 from modules.object_detector import ObjectDetector
 from modules.utils import COCO_OBJECTS
 
 # Set page config
 st.set_page_config(
-    page_title="Live Face & Object Detection",
+    page_title="Face & Object Detection",
     page_icon="🔍",
     layout="wide"
 )
 
 # Page title and description
-st.title("Live Face Mesh & Object Detection")
+st.title("Face Mesh & Object Detection")
 st.markdown("""
 This application uses MediaPipe to perform:
 1. 💡 **Face Mesh Detection**: Identifies facial landmarks
@@ -50,7 +51,7 @@ face_detector = FaceMeshDetector(
     min_tracking_confidence=face_mesh_confidence
 )
 
-model_path = './models/efficientdet_lite0.tflite'
+model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
 object_detector = None
 if os.path.exists(model_path):
     object_detector = ObjectDetector(
@@ -60,69 +61,79 @@ if os.path.exists(model_path):
 else:
     st.sidebar.error(f"Model file not found: {model_path}")
 
-# Main content
-col1, col2 = st.columns([3, 2])
+# Main UI elements
+st.header("Upload Video for Detection")
+video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
 
-with col1:
-    st.header("Live Detection from Camera")
-    run_camera = st.checkbox('Activate Camera')
+if video_file:
+    # Display upload progress
+    upload_progress = st.progress(0)
+    upload_progress.progress(50)  # Simulate instant upload progress (may vary in an actual environment)
 
-    # Placeholder for video display
-    video_placeholder = st.empty()
+    temp_video_path = NamedTemporaryFile(delete=False, suffix=f".{video_file.name.split('.')[-1]}").name
+    with open(temp_video_path, "wb") as temp_video:
+        temp_video.write(video_file.read())
 
-if run_camera:
-    cap = cv2.VideoCapture(0)  # Open the first available camera
+    upload_progress.progress(100)  # Completion of upload
 
-    if not cap.isOpened():
-        st.error("Could not open webcam.")
-    else:
-        while run_camera:
-            ret, frame = cap.read()
-            if not ret:
-                st.error("Failed to capture image")
-                break
+    st.success("Video has been uploaded!")
 
-            # Resize frame for faster processing
-            frame = cv2.resize(frame, (640, 360))
+    # Process the uploaded video
+    processing_progress = st.progress(0)
+    cap = cv2.VideoCapture(temp_video_path)
+    
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-            # Process the frame
-            processed_frame = frame.copy()
+    temp_output_file = NamedTemporaryFile(delete=False, suffix=".mp4")
+    temp_output_file.close()
 
-            face_count = 0
-            frame_objects = {}
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(temp_output_file.name, fourcc, fps, (width, height))
 
-            # Face mesh detection
-            if show_face_mesh:
-                landmarks = face_detector.get_face_landmarks(processed_frame)
-                if landmarks:
-                    processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
-                    face_count = 1
+    processed_frames = 0
 
-            # Object detection
-            if show_object_detection:
-                detection_result = object_detector.detect_objects(processed_frame)
-                processed_frame, detected_objects = object_detector.draw_detection_result(
-                    processed_frame,
-                    detection_result,
-                    objects_to_detect=objects_to_detect if objects_to_detect else None
-                )
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-                # Update object counts
-                frame_objects = detected_objects
-                if frame_objects:
-                    print(frame_objects)  # For debugging purposes
+        # Process the frame
+        processed_frame = frame.copy()
 
-            # Convert BGR to RGB for display
-            processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+        if show_face_mesh:
+            landmarks = face_detector.get_face_landmarks(processed_frame)
+            if landmarks:
+                processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
 
-            # Display the processed frame
-            video_placeholder.image(processed_frame_rgb, channels="RGB", use_container_width=True)
+        if show_object_detection:
+            detection_result = object_detector.detect_objects(processed_frame)
+            processed_frame, _ = object_detector.draw_detection_result(
+                processed_frame,
+                detection_result,
+                objects_to_detect=objects_to_detect if objects_to_detect else None
+            )
 
-            # Exit by checking a key press, not needed for Streamlit (browser-based)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+        # Write the frame to output video
+        out.write(processed_frame)
 
-        cap.release()
+        processed_frames += 1
+        processing_progress.progress(int(processed_frames / total_frames * 100))
 
-st.markdown("---")
-st.caption("Powered by MediaPipe, OpenCV and Streamlit")
+    # Cleanup VideoCapture and VideoWriter
+    cap.release()
+    out.release()
+
+    processing_progress.progress(100)  # Completion of processing
+    st.success("Processing complete!")
+
+    # Provide download link
+    with open(temp_output_file.name, "rb") as file:
+        st.download_button(
+            label="Download Processed Video",
+            data=file,
+            file_name="processed_video.mp4",
+            mime="video/mp4"
+        )

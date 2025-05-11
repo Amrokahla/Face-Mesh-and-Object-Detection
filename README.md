@@ -4,10 +4,10 @@ A Streamlit web application that performs real-time face mesh and object detecti
 
 ## Features
 
-- 💡 **Face Mesh Detection**: Identifies and visualizes 468 facial landmarks
-- 🔍 **Object Detection**: Recognizes 90 common object categories
-- 🎛️ **Customizable Settings**: Adjust confidence thresholds and filter objects
-- 📊 **Live Statistics**: View real-time detection counts
+- **Face Mesh Detection**: Identifies and visualizes 468 facial landmarks
+- **Object Detection**: Recognizes 90 common object categories
+- **Customizable Settings**: Adjust confidence thresholds and filter objects
+- **Live Statistics**: View real-time detection counts
 
 ## Installation
 
@@ -83,7 +83,7 @@ The application can detect 90 common object categories from the COCO dataset, in
 
 ## License
 
-MIT
+Apache License
 
 ## Acknowledgments
 

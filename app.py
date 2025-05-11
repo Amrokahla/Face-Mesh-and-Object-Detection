@@ -42,10 +42,6 @@ objects_to_detect = st.sidebar.multiselect(
     default=["person", "cell phone", "laptop"]
 )
 
-# Initialize model variables
-face_detector = None
-object_detector = None
-
 # Model loading notice
 st.sidebar.markdown("---")
 try:
@@ -69,6 +65,7 @@ try:
                 score_threshold=object_confidence
             )
             st.sidebar.success("Models loaded successfully!")
+
 except Exception as e:
     st.sidebar.error(f"Unexpected error during model initialization: {e}")
 
@@ -107,85 +104,82 @@ with col2:
 
 # Video processing
 if video_file:
-    if face_detector is not None and object_detector is not None:  # Ensure models are loaded
-        try:
-            # Write video to a temporary location
-            temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
-            with open(temp_video_path, "wb") as temp_video:
-                temp_video.write(video_file.read())
-            
-            # Open the video file
-            cap = cv2.VideoCapture(temp_video_path)
+    try:
+        # Write video to a temporary location
+        temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
+        with open(temp_video_path, "wb") as temp_video:
+            temp_video.write(video_file.read())
+        
+        # Open the video file
+        cap = cv2.VideoCapture(temp_video_path)
 
-            if not cap.isOpened():
-                st.error("Could not open video file.")
-            else:
+        if not cap.isOpened():
+            st.error("Could not open video file.")
+        else:
+            face_count = 0
+            object_counts = {}
+
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                # Process the frame
+                processed_frame = frame.copy()
+
+                # Reset counters for this frame
                 face_count = 0
-                object_counts = {}
+                frame_objects = {}
 
-                while cap.isOpened():
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
+                # Face mesh detection
+                if show_face_mesh:
+                    landmarks = face_detector.get_face_landmarks(processed_frame)
+                    if landmarks:
+                        processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                        face_count = 1
 
-                    # Process the frame
-                    processed_frame = frame.copy()
+                # Object detection
+                if show_object_detection:
+                    detection_result = object_detector.detect_objects(processed_frame)
+                    processed_frame, detected_objects = object_detector.draw_detection_result(
+                        processed_frame, 
+                        detection_result, 
+                        objects_to_detect=objects_to_detect if objects_to_detect else None
+                    )
 
-                    # Reset counters for this frame
-                    face_count = 0
-                    frame_objects = {}
+                    # Update object counts
+                    frame_objects = detected_objects
+                    for obj in frame_objects:
+                        if obj in object_counts:
+                            object_counts[obj] = max(object_counts[obj], frame_objects[obj])
+                        else:
+                            object_counts[obj] = frame_objects[obj]
 
-                    # Face mesh detection
-                    if show_face_mesh:
-                        landmarks = face_detector.get_face_landmarks(processed_frame)
-                        if landmarks:
-                            processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
-                            face_count = 1
+                # Convert BGR to RGB for display
+                processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
 
-                    # Object detection
-                    if show_object_detection:
-                        detection_result = object_detector.detect_objects(processed_frame)
-                        processed_frame, detected_objects = object_detector.draw_detection_result(
-                            processed_frame, 
-                            detection_result, 
-                            objects_to_detect=objects_to_detect if objects_to_detect else None
-                        )
+                # Display the processed frame
+                video_placeholder.image(processed_frame_rgb, channels="RGB", use_column_width=True)
 
-                        # Update object counts
-                        frame_objects = detected_objects
-                        for obj in frame_objects:
-                            if obj in object_counts:
-                                object_counts[obj] = max(object_counts[obj], frame_objects[obj])
-                            else:
-                                object_counts[obj] = frame_objects[obj]
+                # Update stats
+                stats_text = f"""
+                ## Current Frame Stats
+                - **Faces Detected:** {face_count}
 
-                    # Convert BGR to RGB for display
-                    processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+                ## Objects Detected
+                """
+                for obj, count in frame_objects.items():
+                    stats_text += f"- **{obj}:** {count}\n"
 
-                    # Display the processed frame
-                    video_placeholder.image(processed_frame_rgb, channels="RGB", use_column_width=True)
+                stats_placeholder.markdown(stats_text)
 
-                    # Update stats
-                    stats_text = f"""
-                    ## Current Frame Stats
-                    - **Faces Detected:** {face_count}
+                # Break the loop if 'q' key is pressed
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
 
-                    ## Objects Detected
-                    """
-                    for obj, count in frame_objects.items():
-                        stats_text += f"- **{obj}:** {count}\n"
+        # Cleanup
+        cap.release()
+        os.remove(temp_video_path)
 
-                    stats_placeholder.markdown(stats_text)
-
-                    # Break the loop if 'q' key is pressed
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        break
-
-            # Cleanup
-            cap.release()
-            os.remove(temp_video_path)
-
-        except Exception as e:
-            st.error(f"Error processing the video: {e}")
-    else:
-        st.error("Models are not initialized. Please check the model loading section.")
+    except Exception as e:
+        st.error(f"Error processing the video: {e}")

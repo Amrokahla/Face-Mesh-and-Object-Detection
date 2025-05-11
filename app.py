@@ -42,76 +42,125 @@ objects_to_detect = st.sidebar.multiselect(
     default=["person", "cell phone", "laptop"]
 )
 
-# Load models only once
-if "face_detector" not in st.session_state:
-    st.session_state.face_detector = FaceMeshDetector(
-        static_image_mode=False,
-        max_num_faces=1,
-        min_detection_confidence=face_mesh_confidence,
-        min_tracking_confidence=face_mesh_confidence
-    )
+st.sidebar.text("Loading Face Mesh Model...")
+face_detector = FaceMeshDetector(
+    static_image_mode=False,
+    max_num_faces=1,
+    min_detection_confidence=face_mesh_confidence,
+    min_tracking_confidence=face_mesh_confidence
+)
+st.sidebar.success("Face Mesh Model loaded successfully!")
 
-if "object_detector" not in st.session_state:
-    model_path = os.path.join(os.path.dirname(__file__), "model", "efficientdet_lite0.tflite")
-    st.session_state.object_detector = ObjectDetector(
+st.sidebar.text("Checking Object Detection Model path...")
+model_path = os.path.join(os.path.dirname(__file__), "model", "efficientdet_lite0.tflite")
+if not os.path.exists(model_path):
+    st.sidebar.error(f"Model file not found: {model_path}")
+    st.sidebar.info("Please download the model file and place it in the models directory")
+else:
+    st.sidebar.text("Loading Object Detection Model...")
+    object_detector = ObjectDetector(
         model_path=model_path,
         score_threshold=object_confidence
     )
-
-# Function to process video
-def process_video(video_file):
-    temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
-    with open(temp_video_path, "wb") as temp_video:
-        temp_video.write(video_file.read())
-
-    cap = cv2.VideoCapture(temp_video_path)
-    if not cap.isOpened():
-        st.error("Could not open video file.")
-        return None
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    out_video_path = "processed_video.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(out_video_path, fourcc, fps / 5, (640, 360))
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame = cv2.resize(frame, (640, 360))
-
-        if show_face_mesh:
-            landmarks = st.session_state.face_detector.get_face_landmarks(frame)
-            if landmarks:
-                frame = st.session_state.face_detector.draw_face_landmarks(frame, landmarks)
-
-        if show_object_detection:
-            detection_result = st.session_state.object_detector.detect_objects(frame)
-            frame, _ = st.session_state.object_detector.draw_detection_result(
-                frame, detection_result, objects_to_detect if objects_to_detect else None
-            )
-
-        out.write(frame)
-
-    out.release()
-    cap.release()
-    os.remove(temp_video_path)
-
-    return out_video_path
+    st.sidebar.success("Object Detection Model loaded successfully!")
 
 # Main content
 st.header("Upload and Process Video")
 video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
+uploaded_video_message = st.empty()
+
+# Initialize session state for video path
+if 'processed_video_path' not in st.session_state:
+    st.session_state.processed_video_path = None
+
+# Video processing logic
+if 'frame_counter' not in st.session_state:
+    st.session_state.frame_counter = 0
 
 if video_file:
-    if "processed_video_path" not in st.session_state:
-        st.session_state.processed_video_path = process_video(video_file)
+    try:
+        uploaded_video_message.success("Video uploaded successfully!")
+        if st.session_state.processed_video_path is None:
+            with st.spinner("Processing video..."):
+                # Processing video only if not already processed
+                temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
+                with open(temp_video_path, "wb") as temp_video:
+                    temp_video.write(video_file.read())
 
-    st.success("Video processing completed successfully!")
-    st.download_button(
-        label="Download the processed video",
-        data=open(st.session_state.processed_video_path, "rb").read(),
-        file_name="processed_video.mp4",
-        mime="video/mp4"
-    )
+                cap = cv2.VideoCapture(temp_video_path)
+
+                if not cap.isOpened():
+                    st.error("Could not open video file.")
+                else:
+                    face_count = 0
+                    object_counts = {}
+                    frame_skip = 5
+                    
+                    # Get original video's fps
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+                    
+                    out_video_path = "processed_video.mp4"
+                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    out = cv2.VideoWriter(out_video_path, fourcc, fps/frame_skip, (640, 360))
+
+                    while cap.isOpened():
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+
+                        st.session_state.frame_counter += 1
+                        if st.session_state.frame_counter % frame_skip != 0:
+                            continue
+
+                        frame = cv2.resize(frame, (640, 360))
+                        processed_frame = frame.copy()
+
+                        face_count = 0
+                        frame_objects = {}
+
+                        if show_face_mesh:
+                            landmarks = face_detector.get_face_landmarks(processed_frame)
+                            if landmarks:
+                                processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                                face_count = 1
+
+                        if show_object_detection:
+                            detection_result = object_detector.detect_objects(processed_frame)
+                            processed_frame, detected_objects = object_detector.draw_detection_result(
+                                processed_frame, 
+                                detection_result, 
+                                objects_to_detect=objects_to_detect if objects_to_detect else None
+                            )
+                            frame_objects = detected_objects
+                            for obj in frame_objects:
+                                if obj in object_counts:
+                                    object_counts[obj] = max(object_counts[obj], frame_objects[obj])
+                                else:
+                                    object_counts[obj] = frame_objects[obj]
+
+                        processed_frame_rgb = cv2.cvtColor(processed_frame, cv2.COLOR_BGR2RGB)
+                        out.write(processed_frame)
+
+                    out.release()
+                    cap.release()
+                    os.remove(temp_video_path)
+                    st.session_state.processed_video_path = out_video_path
+
+        uploaded_video_message.empty()
+        st.success("Video processing completed successfully!")
+        st.markdown("## Download Processed Video")
+        processed_video_file = open(st.session_state.processed_video_path, "rb").read()
+        st.download_button(
+            label="Download the processed video",
+            data=processed_video_file,
+            file_name="processed_video.mp4",
+            mime="video/mp4"
+        )
+
+    except Exception as e:
+        st.error(f"Error processing the video: {e}")
+
+# Cleanup video player
+if st.session_state.processed_video_path and os.path.exists(st.session_state.processed_video_path):
+    os.remove(st.session_state.processed_video_path)
+    st.session_state.processed_video_path = None

@@ -59,7 +59,7 @@ face_detector = FaceMeshDetector(
 st.sidebar.success("Face Mesh Model loaded successfully!")
 
 st.sidebar.text("Checking Object Detection Model path...")
-model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+model_path = os.path.join(os.path.dirname(__file__), "model", "efficientdet_lite0.tflite")
 if not os.path.exists(model_path):
     st.sidebar.error(f"Model file not found: {model_path}")
     st.sidebar.info("Please download the model file and place it in the models directory")

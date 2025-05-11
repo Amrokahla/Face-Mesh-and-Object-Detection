@@ -43,7 +43,6 @@ objects_to_detect = st.sidebar.multiselect(
 )
 
 st.sidebar.text("Loading Face Mesh Model...")
-# Face Mesh Model Logic
 face_detector = FaceMeshDetector(
     static_image_mode=False,
     max_num_faces=1,
@@ -70,15 +69,20 @@ st.header("Upload and Process Video")
 video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
 uploaded_video_message = st.empty()
 
-# Video processing
+# Initialize session state for video path
+if 'processed_video_path' not in st.session_state:
+    st.session_state.processed_video_path = None
+
+# Video processing logic
 if 'frame_counter' not in st.session_state:
     st.session_state.frame_counter = 0
 
 if video_file:
     try:
         uploaded_video_message.success("Video uploaded successfully!")
-        with st.spinner("Processing video..."):
-            if face_detector is not None and object_detector is not None:
+        if st.session_state.processed_video_path is None:
+            with st.spinner("Processing video..."):
+                # Processing video only if not already processed
                 temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
                 with open(temp_video_path, "wb") as temp_video:
                     temp_video.write(video_file.read())
@@ -91,10 +95,13 @@ if video_file:
                     face_count = 0
                     object_counts = {}
                     frame_skip = 5
-
+                    
+                    # Get original video's fps
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+                    
                     out_video_path = "processed_video.mp4"
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    out = cv2.VideoWriter(out_video_path, fourcc, 20.0, (640, 360))
+                    out = cv2.VideoWriter(out_video_path, fourcc, fps, (640, 360))
 
                     while cap.isOpened():
                         ret, frame = cap.read()
@@ -137,13 +144,15 @@ if video_file:
                     out.release()
                     cap.release()
                     os.remove(temp_video_path)
+                    st.session_state.processed_video_path = out_video_path
 
         uploaded_video_message.empty()
         st.success("Video processing completed successfully!")
         st.markdown("## Download Processed Video")
+        processed_video_file = open(st.session_state.processed_video_path, "rb").read()
         st.download_button(
             label="Download the processed video",
-            data=open(out_video_path, "rb").read(),
+            data=processed_video_file,
             file_name="processed_video.mp4",
             mime="video/mp4"
         )
@@ -152,5 +161,6 @@ if video_file:
         st.error(f"Error processing the video: {e}")
 
 # Cleanup video player
-if os.path.exists("processed_video.mp4"):
-    os.remove("processed_video.mp4")
+if st.session_state.processed_video_path and os.path.exists(st.session_state.processed_video_path):
+    os.remove(st.session_state.processed_video_path)
+    st.session_state.processed_video_path = None

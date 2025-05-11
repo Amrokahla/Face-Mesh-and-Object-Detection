@@ -46,27 +46,29 @@ objects_to_detect = st.sidebar.multiselect(
 # Model loading notice
 st.sidebar.markdown("---")
 with st.sidebar.spinner("Loading models..."):
-    # Load models
-    face_detector = FaceMeshDetector(
-        static_image_mode=False,
-        max_num_faces=1,
-        min_detection_confidence=face_mesh_confidence,
-        min_tracking_confidence=face_mesh_confidence
-    )
-    
-    # Get the absolute path to the model file
-    model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
-    
-    # Check if model exists
-    if not os.path.exists(model_path):
-        st.sidebar.error(f"Model file not found: {model_path}")
-        st.sidebar.info("Please download the model file and place it in the models directory")
-    else:
-        object_detector = ObjectDetector(
-            model_path=model_path,
-            score_threshold=object_confidence
+    try:
+        # Load Face Mesh Model
+        face_detector = FaceMeshDetector(
+            static_image_mode=False,
+            max_num_faces=1,
+            min_detection_confidence=face_mesh_confidence,
+            min_tracking_confidence=face_mesh_confidence
         )
-        st.sidebar.success("Models loaded successfully!")
+
+        # Load Object Detection Model
+        model_path = os.path.join(os.path.dirname(__file__), "models", "efficientdet_lite0.tflite")
+        if not os.path.exists(model_path):
+            st.sidebar.error(f"Model file not found: {model_path}")
+            st.sidebar.info("Please download the model file and place it in the models directory")
+        else:
+            object_detector = ObjectDetector(
+                model_path=model_path,
+                score_threshold=object_confidence
+            )
+            st.sidebar.success("Models loaded successfully!")
+    except Exception as e:
+        st.sidebar.error(f"Error loading models: {e}")
+
 
 # Main content
 col1, col2 = st.columns([3, 2])

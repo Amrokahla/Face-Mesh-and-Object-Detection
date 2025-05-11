@@ -39,7 +39,7 @@ st.sidebar.header("Object Filtering")
 objects_to_detect = st.sidebar.multiselect(
     "Select objects to detect",
     options=COCO_OBJECTS,
-    default=["person", "cell phone", "laptop"]
+    default=["person", "cell phone", "car"]
 )
 
 st.sidebar.text("Loading Face Mesh Model...")
@@ -94,7 +94,7 @@ if video_file:
                 else:
                     face_count = 0
                     object_counts = {}
-                    frame_skip = 5
+                    frame_skip = 3
                     
                     # Get original video's fps
                     fps = cap.get(cv2.CAP_PROP_FPS)

@@ -42,7 +42,7 @@ objects_to_detect = st.sidebar.multiselect(
     default=["person", "cell phone", "laptop"]
 )
 
-# Initializing the models with a spinner
+# Model loading notice
 st.sidebar.markdown("---")
 try:
     with st.sidebar.spinner("Loading models..."):
@@ -73,18 +73,10 @@ except Exception as e:
 col1, col2 = st.columns([3, 2])
 
 with col1:
-    # Video capture
-    st.header("Live Detection")
+    # Video upload
+    st.header("Upload Video for Detection")
+    video_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
     video_placeholder = st.empty()
-
-    # Start/stop button with session state to handle toggling
-    if 'run_video' not in st.session_state:
-        st.session_state.run_video = False
-
-    def toggle_video():
-        st.session_state.run_video = not st.session_state.run_video
-
-    st.button("Start/Stop Video", on_click=toggle_video)
 
 with col2:
     # Display statistics and info
@@ -111,21 +103,25 @@ with col2:
     st.caption("Powered by MediaPipe, OpenCV and Streamlit")
 
 # Video processing
-if st.session_state.run_video:
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        st.error("Could not open webcam. Please check your camera connection.")
-    else:
-        try:
-            # Detection counters
+if video_file:
+    try:
+        # Write video to a temporary location
+        temp_video_path = f"temp_video.{video_file.name.split('.')[-1]}"
+        with open(temp_video_path, "wb") as temp_video:
+            temp_video.write(video_file.read())
+        
+        # Open the video file
+        cap = cv2.VideoCapture(temp_video_path)
+
+        if not cap.isOpened():
+            st.error("Could not open video file.")
+        else:
             face_count = 0
             object_counts = {}
 
-            while True:
+            while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
-                    st.error("Failed to capture video frame")
                     break
 
                 # Process the frame
@@ -169,7 +165,7 @@ if st.session_state.run_video:
                 stats_text = f"""
                 ## Current Frame Stats
                 - **Faces Detected:** {face_count}
-                
+
                 ## Objects Detected
                 """
                 for obj, count in frame_objects.items():
@@ -177,15 +173,13 @@ if st.session_state.run_video:
 
                 stats_placeholder.markdown(stats_text)
 
-                # Break the loop if toggle is switched by button
-                if not st.session_state.run_video:
-                    break
-
                 # Break the loop if 'q' key is pressed
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-        
-        finally:
-            # Release the webcam
-            cap.release()
-            cv2.destroyAllWindows()
+
+        # Cleanup
+        cap.release()
+        os.remove(temp_video_path)
+
+    except Exception as e:
+        st.error(f"Error processing the video: {e}")

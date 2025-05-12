@@ -96,12 +96,14 @@ if video_file:
                     object_counts = {}
                     frame_skip = 1
                     
-                    # Get original video's fps
+                    # Get original video's fps and size
                     fps = cap.get(cv2.CAP_PROP_FPS)
+                    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     
                     out_video_path = "processed_video.mp4"
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                    out = cv2.VideoWriter(out_video_path, fourcc, fps/frame_skip, (640, 360))
+                    out = cv2.VideoWriter(out_video_path, fourcc, fps/frame_skip, (width, height))
 
                     while cap.isOpened():
                         ret, frame = cap.read()
@@ -112,7 +114,7 @@ if video_file:
                         if st.session_state.frame_counter % frame_skip != 0:
                             continue
 
-                        frame = cv2.resize(frame, (640, 630))
+                        # No need to resize the frame
                         processed_frame = frame.copy()
 
                         face_count = 0
@@ -159,8 +161,3 @@ if video_file:
 
     except Exception as e:
         st.error(f"Error processing the video: {e}")
-
-# Cleanup video player
-if st.session_state.processed_video_path and os.path.exists(st.session_state.processed_video_path):
-    os.remove(st.session_state.processed_video_path)
-    st.session_state.processed_video_path = None

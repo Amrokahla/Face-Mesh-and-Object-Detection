@@ -112,7 +112,7 @@ if video_file:
                         if st.session_state.frame_counter % frame_skip != 0:
                             continue
 
-                        frame = cv2.resize(frame, (640, 360))
+                        frame = cv2.resize(frame, (640, 630))
                         processed_frame = frame.copy()
 
                         face_count = 0

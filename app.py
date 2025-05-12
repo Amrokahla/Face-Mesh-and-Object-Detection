@@ -94,7 +94,7 @@ if video_file:
                 else:
                     face_count = 0
                     object_counts = {}
-                    frame_skip = 3
+                    frame_skip = 1
                     
                     # Get original video's fps
                     fps = cap.get(cv2.CAP_PROP_FPS)

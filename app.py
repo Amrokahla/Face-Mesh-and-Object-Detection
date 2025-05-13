@@ -121,10 +121,11 @@ if video_file:
                         frame_objects = {}
 
                         if show_face_mesh:
-                            landmarks = face_detector.get_face_landmarks(processed_frame)
-                            if landmarks:
-                                processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
-                                face_count = 1
+                            landmarks_list = face_detector.get_face_landmarks(processed_frame)
+                            if landmarks_list:
+                                for landmarks in landmarks_list:
+                                    processed_frame = face_detector.draw_face_landmarks(processed_frame, landmarks)
+                                face_count = len(landmarks_list)
 
                         if show_object_detection:
                             detection_result = object_detector.detect_objects(processed_frame)

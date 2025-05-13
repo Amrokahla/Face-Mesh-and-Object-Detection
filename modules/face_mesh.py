@@ -43,7 +43,7 @@ class FaceMeshDetector:
         """
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(image_rgb)
-        return results.multi_face_landmarks[0] if results.multi_face_landmarks else None
+        return results.multi_face_landmarks if results.multi_face_landmarks else []
     
     def draw_face_landmarks(self, image, landmarks, color=(0, 255, 0), radius=1):
         """

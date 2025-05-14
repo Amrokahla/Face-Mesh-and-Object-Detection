@@ -1,10 +1,10 @@
 import streamlit as st
 import os
+import cv2
 import numpy as np
 from modules.face_mesh import FaceMeshDetector
 from modules.object_detector import ObjectDetector
 from modules.utils import COCO_OBJECTS
-import cv2
 
 # Set page config
 st.set_page_config(
